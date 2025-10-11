@@ -1,0 +1,106 @@
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any
+from enum import Enum
+
+# Chat/RAG Models
+class ChatRequest(BaseModel):
+    question: str = Field(..., description="User question")
+    subject: Optional[str] = Field(None, description="Subject filter (DataMining, Network)")
+
+class ChatResponse(BaseModel):
+    generation: str = Field(..., description="Generated answer")
+    sources: Optional[List[Dict[str, Any]]] = Field(None, description="Source documents")
+    is_conversational: bool = Field(False, description="Whether response is conversational")
+    subject: Optional[str] = Field(None, description="Applied subject filter")
+
+class ChatSession(BaseModel):
+    session_id: str
+    messages: List[Dict[str, str]]
+
+# Quiz Models
+class DifficultyLevel(str, Enum):
+    EASY = "easy"
+    MEDIUM = "medium" 
+    HARD = "hard"
+
+class QuizGenerateRequest(BaseModel):
+    topic: str = Field(..., description="Topic for quiz generation")
+    subject: Optional[str] = Field(None, description="Subject filter")
+    num_questions: int = Field(5, ge=1, le=20, description="Number of questions")
+
+class QuizQuestion(BaseModel):
+    question: str
+    options: List[str]
+    correct_answer: str
+    explanation: str
+    difficulty: str
+
+class QuizGenerateResponse(BaseModel):
+    success: bool
+    message: str
+    quiz_data: Optional[List[QuizQuestion]] = None
+    subject: Optional[str] = None
+    quiz_id: Optional[str] = None
+
+class QuizAnswerRequest(BaseModel):
+    quiz_id: str
+    question_index: int
+    answer: str  # A, B, C, or D
+
+class QuizAnswerResponse(BaseModel):
+    correct: bool
+    correct_answer: str
+    explanation: str
+    score: Optional[int] = None
+    total_questions: Optional[int] = None
+
+class QuizResultsResponse(BaseModel):
+    quiz_id: str
+    score: int
+    total_questions: int
+    percentage: float
+    feedback: str
+
+# Flashcard Models
+class FlashcardGenerateRequest(BaseModel):
+    topic: str = Field(..., description="Topic for flashcard generation")
+    subject: Optional[str] = Field(None, description="Subject filter")
+    num_cards: int = Field(10, ge=1, le=50, description="Number of flashcards")
+
+class Flashcard(BaseModel):
+    front: str
+    back: str
+    category: str
+    difficulty: str
+    tags: List[str]
+
+class FlashcardGenerateResponse(BaseModel):
+    success: bool
+    message: str
+    flashcard_data: Optional[List[Flashcard]] = None
+    subject: Optional[str] = None
+    set_id: Optional[str] = None
+
+class StudySessionRequest(BaseModel):
+    set_id: str
+    session_type: str = Field("review", description="Type of study session")
+
+class StudySessionResponse(BaseModel):
+    session_id: str
+    flashcards: List[Flashcard]
+    current_card: int
+    total_cards: int
+
+class FlashcardReviewRequest(BaseModel):
+    session_id: str
+    card_index: int
+    difficulty_rating: int = Field(..., ge=1, le=5, description="1=very easy, 5=very hard")
+
+# Common response models
+class ErrorResponse(BaseModel):
+    error: str
+    detail: Optional[str] = None
+
+class SuccessResponse(BaseModel):
+    success: bool
+    message: str
