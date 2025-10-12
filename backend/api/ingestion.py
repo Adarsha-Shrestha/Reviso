@@ -33,7 +33,7 @@ splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
     chunk_overlap=0
 )
 
-def ingest_documents(documents, subject: str):
+def ingest_documents(documents, subject: str, batch_size: int = 50):
     """Helper function to ingest documents into Pinecone"""
     try:
         # Add metadata to documents
@@ -44,17 +44,28 @@ def ingest_documents(documents, subject: str):
         # Split documents
         split_documents = splitter.split_documents(documents)
         
-        # Upload to Pinecone
-        PineconeVectorStore.from_documents(
-            documents=split_documents,
-            embedding=embedding,
-            index_name=os.environ["INDEX_NAME"]
-        )
+        logger.info(f"Total chunks to process: {len(split_documents)}")
         
-        logger.info(f"✅ Successfully ingested {len(split_documents)} chunks with subject: {subject}")
+        # Upload to Pinecone in batches to avoid token limit
+        total_ingested = 0
+        for i in range(0, len(split_documents), batch_size):
+            batch = split_documents[i:i + batch_size]
+            try:
+                PineconeVectorStore.from_documents(
+                    documents=batch,
+                    embedding=embedding,
+                    index_name=os.environ["INDEX_NAME"]
+                )
+                total_ingested += len(batch)
+                logger.info(f"✅ Batch {i//batch_size + 1}: Ingested {len(batch)} chunks ({total_ingested}/{len(split_documents)})")
+            except Exception as batch_error:
+                logger.error(f"❌ Error in batch {i//batch_size + 1}: {str(batch_error)}")
+                raise
+        
+        logger.info(f"✅ Successfully ingested {total_ingested} chunks with subject: {subject}")
         return {
             "status": "success",
-            "chunks_ingested": len(split_documents),
+            "chunks_ingested": total_ingested,
             "subject": subject
         }
     except Exception as e:
