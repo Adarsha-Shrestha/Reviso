@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 env_path = os.path.join(os.path.dirname(__file__), ".env")
 load_dotenv(dotenv_path=env_path)
 
-import config  # This loads environment variables
+# import config  # This loads environment variables
 
 # Import your existing systems
 from graph.graph import app as rag_app
