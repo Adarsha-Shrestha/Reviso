@@ -22,6 +22,7 @@ from api.chat import router as chat_router
 from api.quiz import router as quiz_router
 from api.flashcard import router as flashcard_router
 from api.proctoring import router as proctoring_router, set_proctoring_system
+from api.ingestion import router as ingestion_router
 from api.models import *
 
 
@@ -98,6 +99,8 @@ app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 app.include_router(quiz_router, prefix="/api/quiz", tags=["quiz"])
 app.include_router(flashcard_router, prefix="/api/flashcard", tags=["flashcard"])
 app.include_router(proctoring_router, prefix="/api/proctoring", tags=["Proctoring"])
+app.include_router(ingestion_router, prefix="/api/ingestion", tags=["Ingestion"])
+
 
 @app.get("/")
 async def root():
