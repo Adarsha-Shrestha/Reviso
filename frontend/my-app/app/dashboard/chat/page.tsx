@@ -4,18 +4,28 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Sparkles, Send, Loader2, BookOpen, Plus, MessageSquare, MoreVertical, Trash2 } from "lucide-react"
+import { Sparkles, Send, Loader2, BookOpen, Plus, MessageSquare, MoreVertical, Trash2, ChevronDown, ChevronUp } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 const API_BASE_URL = "http://localhost:8000/api/chat"
 
+interface Source {
+  document_id: number
+  page_content_preview: string
+  subject?: string
+  page?: number | string
+  source_file?: string
+  [key: string]: any
+}
+
 interface Message {
   role: "user" | "assistant"
   content: string
   timestamp: string
-  sources?: Array<{ page_content: string; metadata: any }>
+  sources?: Source[]
   isConversational?: boolean
+  sourcesExpanded?: boolean
 }
 
 interface Session {
@@ -32,16 +42,85 @@ interface ChatSession {
   messages: Message[]
 }
 
-// Friendly labels for display
 const SUBJECT_LABELS: Record<string, string> = {
   "All Subjects": "All Subjects",
   Network: "Network Systems",
   DataMining: "Data Mining",
   Distributed: "Distributed Computing",
+  Energy: "Energy"
 }
 
 const STORAGE_KEY = "chat_sessions"
 const CHAT_HISTORY_KEY = "chat_history"
+
+function SourceCard({ source }: { source: Source }) {
+  const [expanded, setExpanded] = useState(false)
+
+  return (
+    <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-start gap-2 hover:bg-muted/70 p-3 transition-colors"
+      >
+        <div className="flex-1 text-left">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+            <span className="font-medium text-sm">Source {source.document_id}</span>
+            {/* {source.source_file && (
+              <span className="text-xs text-muted-foreground truncate">
+                {source.source_file.split('/').pop()}
+              </span>
+            )} */}
+          </div>
+          {!expanded && (
+            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+              {source.page_content_preview}
+            </p>
+          )}
+        </div>
+        <div className="flex-shrink-0">
+          {expanded ? (
+            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+          ) : (
+            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          )}
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="px-3 py-2 border-t border-border bg-muted/25 space-y-2">
+          {source.subject && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">Subject</p>
+              <p className="text-sm text-foreground">{source.subject}</p>
+            </div>
+          )}
+          
+          {source.page && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">Page</p>
+              <p className="text-sm text-foreground">{source.page}</p>
+            </div>
+          )}
+          
+          {source.source_file && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">File</p>
+              <p className="text-sm text-foreground break-all">{source.source_file}</p>
+            </div>
+          )}
+          
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground">Preview</p>
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+              {source.page_content_preview}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function ChatPage() {
   const [sessions, setSessions] = useState<Session[]>([])
@@ -52,13 +131,13 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [chatHistory, setChatHistory] = useState<Record<string, Message[]>>({})
+  const [expandedSources, setExpandedSources] = useState<Set<number>>(new Set())
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  // Load sessions and chat history from localStorage on mount (client-side only)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       loadSessionsFromStorage()
@@ -66,21 +145,18 @@ export default function ChatPage() {
     }
   }, [])
 
-  // Save sessions to localStorage whenever they change (client-side only)
   useEffect(() => {
     if (typeof window !== 'undefined' && sessions.length > 0) {
       saveSessionsToStorage()
     }
   }, [sessions])
 
-  // Save chat history to localStorage whenever it changes
   useEffect(() => {
     if (typeof window !== 'undefined' && Object.keys(chatHistory).length > 0) {
       saveChatHistoryToStorage()
     }
   }, [chatHistory])
 
-  // Save current session messages to chat history whenever messages change
   useEffect(() => {
     if (currentSessionId && messages.length > 0) {
       setChatHistory(prev => ({
@@ -94,11 +170,10 @@ export default function ChatPage() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
-        const parsedSessions = JSON.parse(stored)
-        setSessions(parsedSessions)
+        setSessions(JSON.parse(stored))
       }
     } catch (error) {
-      console.error("Error loading sessions from localStorage:", error)
+      console.error("Error loading sessions:", error)
     }
   }
 
@@ -106,7 +181,7 @@ export default function ChatPage() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions))
     } catch (error) {
-      console.error("Error saving sessions to localStorage:", error)
+      console.error("Error saving sessions:", error)
     }
   }
 
@@ -114,11 +189,10 @@ export default function ChatPage() {
     try {
       const stored = localStorage.getItem(CHAT_HISTORY_KEY)
       if (stored) {
-        const parsedHistory = JSON.parse(stored)
-        setChatHistory(parsedHistory)
+        setChatHistory(JSON.parse(stored))
       }
     } catch (error) {
-      console.error("Error loading chat history from localStorage:", error)
+      console.error("Error loading chat history:", error)
     }
   }
 
@@ -126,26 +200,22 @@ export default function ChatPage() {
     try {
       localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(chatHistory))
     } catch (error) {
-      console.error("Error saving chat history to localStorage:", error)
+      console.error("Error saving chat history:", error)
     }
   }
 
   const createNewSession = async (newSubject?: string): Promise<string | null> => {
     try {
       const chosenSubject = newSubject || subject || "All Subjects"
-
       const response = await fetch(`${API_BASE_URL}/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ subject: chosenSubject }),
       })
       
-      if (!response.ok) {
-        throw new Error(`Failed to create session: ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`Failed to create session: ${response.status}`)
       
       const data = await response.json()
-
       const newSession: Session = {
         session_id: data.session_id,
         message_count: 0,
@@ -159,86 +229,57 @@ export default function ChatPage() {
       setMessages([])
       setSubject(chosenSubject)
       setSessions((prev) => [newSession, ...prev])
-
-      // Initialize empty chat history for new session
-      setChatHistory(prev => ({
-        ...prev,
-        [data.session_id]: []
-      }))
+      setChatHistory(prev => ({ ...prev, [data.session_id]: [] }))
 
       return data.session_id
     } catch (error) {
       console.error("Error creating session:", error)
-      alert("Failed to create session. Please make sure the backend is running.")
+      alert("Failed to create session. Backend running?")
       return null
     }
   }
 
   const loadSession = async (sessionId: string) => {
     try {
-      // First check if we have the chat history in localStorage
       if (chatHistory[sessionId] && chatHistory[sessionId].length > 0) {
         setCurrentSessionId(sessionId)
         setMessages(chatHistory[sessionId])
-        
         const session = sessions.find((s) => s.session_id === sessionId)
         if (session?.subject) setSubject(session.subject)
         return
       }
 
-      // If not in localStorage, try to fetch from backend
       const response = await fetch(`${API_BASE_URL}/session/${sessionId}`)
-      
-      if (!response.ok) {
-        throw new Error(`Failed to load session: ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`Failed to load session: ${response.status}`)
       
       const data: ChatSession = await response.json()
-
       setCurrentSessionId(sessionId)
       const loadedMessages = data.messages || []
       setMessages(loadedMessages)
-
-      // Store the loaded messages in chat history
-      setChatHistory(prev => ({
-        ...prev,
-        [sessionId]: loadedMessages
-      }))
+      setChatHistory(prev => ({ ...prev, [sessionId]: loadedMessages }))
 
       const session = sessions.find((s) => s.session_id === sessionId)
       if (session?.subject) setSubject(session.subject)
     } catch (error) {
       console.error("Error loading session:", error)
-      alert("Failed to load session. It may have been deleted from the backend.")
+      alert("Failed to load session")
     }
   }
 
   const deleteSession = async (sessionId: string) => {
     try {
       await fetch(`${API_BASE_URL}/session/${sessionId}`, { method: "DELETE" })
-
       if (currentSessionId === sessionId) {
         setCurrentSessionId(null)
         setMessages([])
         setSubject("All Subjects")
       }
-
-      // Remove from sessions list
       setSessions((prev) => prev.filter((s) => s.session_id !== sessionId))
-
-      // Remove from chat history
       setChatHistory(prev => {
         const newHistory = { ...prev }
         delete newHistory[sessionId]
         return newHistory
       })
-
-      // Update localStorage immediately
-      if (typeof window !== 'undefined') {
-        const updatedHistory = { ...chatHistory }
-        delete updatedHistory[sessionId]
-        localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(updatedHistory))
-      }
     } catch (error) {
       console.error("Error deleting session:", error)
     }
@@ -278,9 +319,7 @@ export default function ChatPage() {
         }),
       })
       
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.status}`)
-      }
+      if (!response.ok) throw new Error(`Failed to send message: ${response.status}`)
       
       const data = await response.json()
 
@@ -293,7 +332,6 @@ export default function ChatPage() {
       }
       setMessages((prev) => [...prev, assistantMessage])
 
-      // Update session with title and preview
       setSessions((prev) =>
         prev.map((s) =>
           s.session_id === sessionId
@@ -313,7 +351,7 @@ export default function ChatPage() {
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, I encountered an error. Please make sure the backend is running on http://localhost:8000",
+          content: "Sorry, I encountered an error. Check if backend is running.",
           timestamp: new Date().toISOString(),
         },
       ])
@@ -327,7 +365,6 @@ export default function ChatPage() {
   }
 
   const getSessionPreview = (session: Session) => {
-    // Try to get preview from chat history
     if (chatHistory[session.session_id] && chatHistory[session.session_id].length > 0) {
       const firstUserMessage = chatHistory[session.session_id].find(msg => msg.role === "user")
       if (firstUserMessage) {
@@ -407,6 +444,7 @@ export default function ChatPage() {
               <SelectItem value="DataMining">Data Mining</SelectItem>
               <SelectItem value="Network">Network Systems</SelectItem>
               <SelectItem value="Distributed">Distributed Computing</SelectItem>
+              <SelectItem value="Energy">Energy</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -438,19 +476,40 @@ export default function ChatPage() {
                     }`}
                   >
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                    
                     {message.sources && message.sources.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-border">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
-                          <BookOpen className="w-3 h-3" />
-                          <span>Sources ({message.sources.length})</span>
-                        </div>
-                        <div className="space-y-2">
-                          {message.sources.slice(0, 2).map((source, idx) => (
-                            <div key={idx} className="text-xs bg-muted/50 p-2 rounded">
-                              <p className="line-clamp-2">{source.page_content}</p>
-                            </div>
-                          ))}
-                        </div>
+                      <div className="mt-4 pt-4 border-t border-border">
+                        <button
+                          onClick={() => {
+                            const msgIndex = messages.indexOf(message)
+                            setExpandedSources(prev => {
+                              const newSet = new Set(prev)
+                              if (newSet.has(msgIndex)) {
+                                newSet.delete(msgIndex)
+                              } else {
+                                newSet.add(msgIndex)
+                              }
+                              return newSet
+                            })
+                          }}
+                          className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+                        >
+                          <BookOpen className="w-4 h-4 text-primary" />
+                          <span className="font-medium text-sm">Sources ({message.sources.length})</span>
+                          {expandedSources.has(messages.indexOf(message)) ? (
+                            <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          )}
+                        </button>
+                        
+                        {expandedSources.has(messages.indexOf(message)) && (
+                          <div className="space-y-2 mt-3">
+                            {message.sources.map((source, idx) => (
+                              <SourceCard key={idx} source={source} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
                   </Card>
