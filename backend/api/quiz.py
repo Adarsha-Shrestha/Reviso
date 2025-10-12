@@ -7,7 +7,7 @@ from api.models import (
     QuizGenerateRequest, QuizGenerateResponse, QuizQuestion,
     QuizAnswerRequest, QuizAnswerResponse, QuizResultsResponse
 )
-from app2 import QuizSystem
+from quiz import QuizSystem
 
 router = APIRouter()
 

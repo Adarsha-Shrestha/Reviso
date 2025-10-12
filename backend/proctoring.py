@@ -21,7 +21,7 @@ class ProctoringSystem:
         self.R_H_RIGHT = [263]
         
         # YOLO Model Setup
-        self.yolo_model = YOLO('models/yolo8m.pt')
+        self.yolo_model = YOLO('models/yolov8m.pt')
         self.class_names = ['person', 'book', 'cell phone']
         self.class_indices = [i for i, name in self.yolo_model.names.items() if name in self.class_names]
         

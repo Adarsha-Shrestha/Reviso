@@ -8,7 +8,7 @@ from api.models import (
     FlashcardGenerateRequest, FlashcardGenerateResponse, Flashcard,
     StudySessionRequest, StudySessionResponse, FlashcardReviewRequest
 )
-from app3 import FlashcardSystem
+from flashcard import FlashcardSystem
 
 router = APIRouter()
 
