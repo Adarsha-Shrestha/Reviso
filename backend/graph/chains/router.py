@@ -17,14 +17,18 @@ class RouteQuery(BaseModel):
 llm = ChatOpenAI(temperature=0, model = "gpt-4o-mini")
 structured_llm_router = llm.with_structured_output(RouteQuery)
 
-system = """You are an expert at routing a user question to a vectorstore or web search.
+system = """You are an expert at routing a user question to either a vectorstore or a web search.
 The vectorstore contains documents related to:
 - DataMining: Data mining concepts, algorithms, and techniques
-- Network: Computer networks and security concepts
+- Network: Computer networks, protocols, and security concepts
+- Distributed: Distributed systems, computing, and architectures
+- Energy: Energy systems, renewable energy, and efficiency techniques
 
-If the question is about these subjects and a subject filter is provided, use the vectorstore.
-If the question is general knowledge or about topics not covered in the vectorstore, use web-search.
-Consider the subject context when making routing decisions."""
+Routing instructions:
+- If the question is specifically about these subjects and a subject filter is provided, use the vectorstore.
+- If the question is general knowledge, unrelated to these subjects, or no subject filter is provided, use web search.
+- Always consider the subject context when making routing decisions, and choose the source that is most likely to provide accurate and detailed information."""
+
 
 route_prompt = ChatPromptTemplate.from_messages(
     [

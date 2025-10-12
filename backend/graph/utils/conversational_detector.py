@@ -15,7 +15,7 @@ class QueryType(BaseModel):
     )
 
 
-llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
+llm = ChatOpenAI(temperature=0, model="gpt-4o-mini")
 structured_llm = llm.with_structured_output(QueryType)
 
 system = """You are an expert at classifying user queries. Determine if a query is:

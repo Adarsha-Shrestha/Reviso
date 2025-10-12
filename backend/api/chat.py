@@ -25,7 +25,7 @@ async def send_message(request: ChatRequest, rag_app=Depends(get_rag_app)):
     """
     try:
         # Validate subject if provided
-        valid_subjects = ["DataMining", "Network", "Distributed"]
+        valid_subjects = ["DataMining", "Network", "Distributed", "Energy"]
         if request.subject and request.subject not in valid_subjects:
             raise HTTPException(
                 status_code=400, 
@@ -167,6 +167,6 @@ async def get_available_subjects():
     Get list of available subjects for filtering
     """
     return {
-        "subjects": ["DataMining", "Network"],
+        "subjects": ["DataMining", "Network", "Distributed", "Energy"],
         "description": "Available subject filters for RAG queries"
     }
