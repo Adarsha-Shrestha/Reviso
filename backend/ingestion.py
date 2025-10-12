@@ -13,25 +13,25 @@ embedding=OpenAIEmbeddings(openai_api_key=os.getenv("OPENAI_API_KEY"))
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index(os.environ["INDEX_NAME"])
 
-splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(chunk_size=700, chunk_overlap=0)
+# splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(chunk_size=700, chunk_overlap=0)
 
-data_docs = PyPDFLoader(r"C:\Users\admin\Downloads\7th sem\7. Data Mining\Data Mining short  book.pdf").load()
-split_data_docs = splitter.split_documents(data_docs)
+# data_docs = PyPDFLoader(r"C:\Users\admin\Downloads\7th sem\7. Data Mining\Data Mining short  book.pdf").load()
+# split_data_docs = splitter.split_documents(data_docs)
 
-# Add metadata
-for doc in split_data_docs:
-    doc.metadata = doc.metadata or {}
-    doc.metadata["subject"] = "DataMining"
+# # Add metadata
+# for doc in split_data_docs:
+#     doc.metadata = doc.metadata or {}
+#     doc.metadata["subject"] = "DataMining"
     
-network_docs = PyPDFLoader(r"C:\Users\admin\Downloads\7th sem\2. Computer Network and Security\Computer_Network_Dinesh_Ghemosu.pdf").load()
-split_network_docs = splitter.split_documents(network_docs)
+# network_docs = PyPDFLoader(r"C:\Users\admin\Downloads\7th sem\2. Computer Network and Security\Computer_Network_Dinesh_Ghemosu.pdf").load()
+# split_network_docs = splitter.split_documents(network_docs)
 
-# Add metadata
-for doc in split_network_docs:
-    doc.metadata = doc.metadata or {}
-    doc.metadata["subject"] = "Network"
+# # Add metadata
+# for doc in split_network_docs:
+#     doc.metadata = doc.metadata or {}
+#     doc.metadata["subject"] = "Network"
     
-all_docs = split_data_docs + split_network_docs
+# all_docs = split_data_docs + split_network_docs
 
 # def batch_upload(docs, batch_size=50):
 #     for i in range(0, len(docs), batch_size):

@@ -14,7 +14,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -218,3 +217,17 @@ __marimo__/
 *.pt
 
 cheating_recordings
+
+## Frontend
+
+frontend/my-app/node_modules/
+frontend/my-app/.next/
+frontend/my-app/.turbo/
+frontend/my-app/.swc/
+frontend/my-app/out/
+frontend/my-app/dist/
+frontend/my-app/build/
+frontend/my-app/.env.local
+frontend/my-app/.env.development.local
+frontend/my-app/.env.production.local
+frontend/my-app/.env.test.local
