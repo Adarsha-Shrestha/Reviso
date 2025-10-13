@@ -6,7 +6,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Sparkles, MessageSquare, Brain, BookOpen, BarChart3, Upload, FolderOpen, LogOut, History } from "lucide-react"
+import { Sparkles, MessageSquare, Brain, BookOpen, BarChart3, FolderOpen, LogOut, FileText, Award } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -55,18 +55,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             </Button>
             
-            {/* <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/history">
-                <History className="w-4 h-4 mr-2" />
-                History
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/exam">
+                <FileText className="w-4 h-4 mr-2" />
+                Exam
               </Link>
-            </Button> */}
-            {/* <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/upload">
-                <Upload className="w-4 h-4 mr-2" />
-                Upload
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/evaluate">
+                <Award className="w-4 h-4 mr-2" />
+                Evaluate
               </Link>
-            </Button> */}
+            </Button>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard/documents">
                 <FolderOpen className="w-4 h-4 mr-2" />

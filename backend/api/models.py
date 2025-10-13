@@ -104,3 +104,70 @@ class ErrorResponse(BaseModel):
 class SuccessResponse(BaseModel):
     success: bool
     message: str
+    
+# Add these models to your existing api/models.py file
+
+# Exam Models
+class ExamGenerateRequest(BaseModel):
+    topic: str = Field(..., description="Topic for exam generation")
+    subject: str = Field(..., description="Subject filter (required)")
+    num_hard: int = Field(3, ge=1, le=5, description="Number of hard questions (10 marks each)")
+    num_medium: int = Field(9, ge=1, le=15, description="Number of medium questions (5 marks each)")
+
+class ExamQuestion(BaseModel):
+    question_number: int
+    question: str
+    question_type: str
+    difficulty: str
+    marks: int
+
+class ExamGenerateResponse(BaseModel):
+    success: bool
+    message: str
+    exam_id: Optional[str] = None
+    exam_data: Optional[List[ExamQuestion]] = None
+    topic: Optional[str] = None
+    subject: Optional[str] = None
+    total_marks: Optional[int] = None
+    total_questions: Optional[int] = None
+
+class ExamSessionResponse(BaseModel):
+    session_id: str
+    exam_id: str
+    topic: str
+    subject: str
+    total_questions: int
+    total_marks: int
+    started_at: str
+
+class AnswerSubmission(BaseModel):
+    question_number: int = Field(..., description="Question number being answered")
+    answer: str = Field(..., description="Student's answer to the question")
+
+class ExamSubmissionRequest(BaseModel):
+    session_id: str = Field(..., description="Exam session ID")
+    answers: List[AnswerSubmission] = Field(..., description="List of answers")
+
+class QuestionEvaluation(BaseModel):
+    question_number: int
+    score: float
+    max_marks: int
+    feedback: str
+    strengths: List[str]
+    improvements: List[str]
+    key_points_covered: List[str]
+    key_points_missed: List[str]
+
+class ExamEvaluationResponse(BaseModel):
+    success: bool
+    exam_id: str
+    session_id: str
+    topic: str
+    subject: Optional[str] = None
+    evaluations: List[QuestionEvaluation]
+    total_score: float
+    total_max_marks: int
+    percentage: float
+    overall_feedback: str
+    questions_evaluated: int
+    evaluated_at: str
