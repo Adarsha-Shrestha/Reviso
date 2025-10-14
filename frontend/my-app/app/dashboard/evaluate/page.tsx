@@ -50,177 +50,44 @@ interface SubmittedExam {
   }>;
 }
 
-const EvaluatePage = () => {
-  const searchParams = useSearchParams();
-  const [loading, setLoading] = useState(false);
-  const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
-  const [expandedQuestions, setExpandedQuestions] = useState<Record<number, boolean>>({});
-  const [submittedExams, setSubmittedExams] = useState<SubmittedExam[]>([]);
-  const [evaluations, setEvaluations] = useState<EvaluationData[]>([]);
-  const [selectedView, setSelectedView] = useState<'list' | 'detail'>('list');
-  const [error, setError] = useState<string>('');
-  
-  // Search and Filter States
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const [filterScore, setFilterScore] = useState<'all' | 'excellent' | 'good' | 'poor'>('all');
-  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'score-desc' | 'score-asc'>('date-desc');
-  const [showFilters, setShowFilters] = useState(false);
-
-  useEffect(() => {
-    loadSubmittedExams();
-    loadEvaluations();
-  }, []);
-
-  // Auto-open evaluation if session parameter is present OR from localStorage
-  useEffect(() => {
-    const sessionFromUrl = searchParams.get('session');
-    const sessionFromStorage = localStorage.getItem('latestSubmittedSession');
-    
-    const sessionId = sessionFromUrl || sessionFromStorage;
-    
-    if (sessionId && submittedExams.length > 0 && evaluations.length > 0) {
-      // Clear the localStorage flag after using it
-      if (sessionFromStorage) {
-        localStorage.removeItem('latestSubmittedSession');
-      }
-      viewEvaluation(sessionId);
-    }
-  }, [searchParams, submittedExams, evaluations]);
-
-  const loadSubmittedExams = () => {
-    try {
-      const stored = localStorage.getItem('submittedExams');
-      if (stored) {
-        const exams = JSON.parse(stored);
-        setSubmittedExams(exams);
-      }
-    } catch (err) {
-      console.error('Failed to load submitted exams:', err);
-    }
-  };
-
-  const loadEvaluations = () => {
-    try {
-      const stored = localStorage.getItem('examEvaluations');
-      if (stored) {
-        const evals = JSON.parse(stored);
-        setEvaluations(evals);
-      }
-    } catch (err) {
-      console.error('Failed to load evaluations:', err);
-    }
-  };
-
-  const getEvaluationForExam = (sessionId: string): EvaluationData | null => {
-    return evaluations.find(e => e.session_id === sessionId) || null;
-  };
-
-  const viewEvaluation = (sessionId: string) => {
-    const evalData = getEvaluationForExam(sessionId);
-    if (evalData) {
-      setEvaluation(evalData);
-      setSelectedView('detail');
-      setError('');
-    } else {
-      setError('Evaluation not found for this exam');
-    }
-  };
-
-  const toggleQuestion = (questionNumber: number) => {
-    setExpandedQuestions(prev => ({
-      ...prev,
-      [questionNumber]: !prev[questionNumber]
-    }));
-  };
-
-  const getGradeColor = (percentage: number): string => {
-    if (percentage >= 90) return 'text-green-600';
-    if (percentage >= 80) return 'text-blue-600';
-    if (percentage >= 70) return 'text-yellow-600';
-    if (percentage >= 60) return 'text-orange-600';
-    return 'text-red-600';
-  };
-
-  const getGradeBgColor = (percentage: number): string => {
-    if (percentage >= 90) return 'bg-green-50 border-green-200';
-    if (percentage >= 80) return 'bg-blue-50 border-blue-200';
-    if (percentage >= 70) return 'bg-yellow-50 border-yellow-200';
-    if (percentage >= 60) return 'bg-orange-50 border-orange-200';
-    return 'bg-red-50 border-red-200';
-  };
-
-  const getScorePercentage = (score: number, maxMarks: number): number => {
-    return parseFloat(((score / maxMarks) * 100).toFixed(1));
-  };
-
-  const getGradeLabel = (percentage: number): string => {
-    if (percentage >= 90) return 'Excellent';
-    if (percentage >= 80) return 'Very Good';
-    if (percentage >= 70) return 'Good';
-    if (percentage >= 60) return 'Satisfactory';
-    return 'Needs Improvement';
-  };
-
-  // Filter and sort exams
-  const getFilteredAndSortedExams = () => {
-    let filtered = submittedExams.filter(exam => {
-      // Search filter
-      const matchesSearch = 
-        exam.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        exam.subject.toLowerCase().includes(searchQuery.toLowerCase());
-      
-      if (!matchesSearch) return false;
-
-      // Score filter
-      if (filterScore !== 'all') {
-        const evalData = getEvaluationForExam(exam.session_id);
-        if (!evalData) return false;
-        
-        const percentage = evalData.percentage;
-        if (filterScore === 'excellent' && percentage < 80) return false;
-        if (filterScore === 'good' && (percentage < 60 || percentage >= 80)) return false;
-        if (filterScore === 'poor' && percentage >= 60) return false;
-      }
-
-      return true;
-    });
-
-    // Sort exams
-    filtered.sort((a, b) => {
-      const evalA = getEvaluationForExam(a.session_id);
-      const evalB = getEvaluationForExam(b.session_id);
-
-      switch (sortBy) {
-        case 'date-desc':
-          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
-        case 'date-asc':
-          return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
-        case 'score-desc':
-          if (!evalA) return 1;
-          if (!evalB) return -1;
-          return evalB.percentage - evalA.percentage;
-        case 'score-asc':
-          if (!evalA) return 1;
-          if (!evalB) return -1;
-          return evalA.percentage - evalB.percentage;
-        default:
-          return 0;
-      }
-    });
-
-    return filtered;
-  };
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setFilterScore('all');
-    setSortBy('date-desc');
-  };
-
-  const hasActiveFilters = searchQuery !== '' || filterScore !== 'all' || sortBy !== 'date-desc';
-
   // List View - Shows all submitted exams
-  const ListView = () => {
+  const ListView = React.memo(({
+  submittedExams,
+  evaluations,
+  searchQuery,
+  setSearchQuery,
+  filterScore,
+  setFilterScore,
+  sortBy,
+  setSortBy,
+  showFilters,
+  setShowFilters,
+  viewEvaluation,
+  getEvaluationForExam,
+  getGradeColor,
+  getGradeLabel,
+  getFilteredAndSortedExams,
+  clearFilters,
+  hasActiveFilters
+}: {
+  submittedExams: SubmittedExam[];
+  evaluations: EvaluationData[];
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  filterScore: 'all' | 'excellent' | 'good' | 'poor';
+  setFilterScore: (filter: 'all' | 'excellent' | 'good' | 'poor') => void;
+  sortBy: 'date-desc' | 'date-asc' | 'score-desc' | 'score-asc';
+  setSortBy: (sort: 'date-desc' | 'date-asc' | 'score-desc' | 'score-asc') => void;
+  showFilters: boolean;
+  setShowFilters: (show: boolean) => void;
+  viewEvaluation: (sessionId: string) => void;
+  getEvaluationForExam: (sessionId: string) => EvaluationData | null;
+  getGradeColor: (percentage: number) => string;
+  getGradeLabel: (percentage: number) => string;
+  getFilteredAndSortedExams: () => SubmittedExam[];
+  clearFilters: () => void;
+  hasActiveFilters: boolean;
+}) => {
     const filteredExams = getFilteredAndSortedExams();
 
     return (
@@ -484,10 +351,32 @@ const EvaluatePage = () => {
         )}
       </div>
     );
-  };
+  });
 
   // Detail View - Shows detailed evaluation
-  const DetailView = () => {
+  const DetailView = React.memo(({
+  evaluation,
+  expandedQuestions,
+  toggleQuestion,
+  getGradeColor,
+  getGradeBgColor,
+  getScorePercentage,
+  getGradeLabel,
+  setSelectedView,
+  setEvaluation,
+  setExpandedQuestions
+}: {
+  evaluation: EvaluationData;
+  expandedQuestions: Record<number, boolean>;
+  toggleQuestion: (qn: number) => void;
+  getGradeColor: (p: number) => string;
+  getGradeBgColor: (p: number) => string;
+  getScorePercentage: (score: number, max: number) => number;
+  getGradeLabel: (p: number) => string;
+  setSelectedView: (view: 'list' | 'detail') => void;
+  setEvaluation: (evala: EvaluationData | null) => void;
+  setExpandedQuestions: (expanded: Record<number, boolean>) => void;
+}) => {
     if (!evaluation) return null;
 
     const percentage = evaluation.percentage;
@@ -708,7 +597,178 @@ const EvaluatePage = () => {
         </div>
       </div>
     );
+  });
+
+const EvaluatePage = () => {
+  const searchParams = useSearchParams();
+  const [loading, setLoading] = useState(false);
+  const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
+  const [expandedQuestions, setExpandedQuestions] = useState<Record<number, boolean>>({});
+  const [submittedExams, setSubmittedExams] = useState<SubmittedExam[]>([]);
+  const [evaluations, setEvaluations] = useState<EvaluationData[]>([]);
+  const [selectedView, setSelectedView] = useState<'list' | 'detail'>('list');
+  const [error, setError] = useState<string>('');
+  
+  // Search and Filter States
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [filterScore, setFilterScore] = useState<'all' | 'excellent' | 'good' | 'poor'>('all');
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'score-desc' | 'score-asc'>('date-desc');
+  const [showFilters, setShowFilters] = useState(false);
+
+  useEffect(() => {
+    loadSubmittedExams();
+    loadEvaluations();
+  }, []);
+
+  // Auto-open evaluation if session parameter is present OR from localStorage
+  useEffect(() => {
+    const sessionFromUrl = searchParams.get('session');
+    const sessionFromStorage = localStorage.getItem('latestSubmittedSession');
+    
+    const sessionId = sessionFromUrl || sessionFromStorage;
+    
+    if (sessionId && submittedExams.length > 0 && evaluations.length > 0) {
+      // Clear the localStorage flag after using it
+      if (sessionFromStorage) {
+        localStorage.removeItem('latestSubmittedSession');
+      }
+      viewEvaluation(sessionId);
+    }
+  }, [searchParams, submittedExams, evaluations]);
+
+  const loadSubmittedExams = () => {
+    try {
+      const stored = localStorage.getItem('submittedExams');
+      if (stored) {
+        const exams = JSON.parse(stored);
+        setSubmittedExams(exams);
+      }
+    } catch (err) {
+      console.error('Failed to load submitted exams:', err);
+    }
   };
+
+  const loadEvaluations = () => {
+    try {
+      const stored = localStorage.getItem('examEvaluations');
+      if (stored) {
+        const evals = JSON.parse(stored);
+        setEvaluations(evals);
+      }
+    } catch (err) {
+      console.error('Failed to load evaluations:', err);
+    }
+  };
+
+  const getEvaluationForExam = (sessionId: string): EvaluationData | null => {
+    return evaluations.find(e => e.session_id === sessionId) || null;
+  };
+
+  const viewEvaluation = (sessionId: string) => {
+    const evalData = getEvaluationForExam(sessionId);
+    if (evalData) {
+      setEvaluation(evalData);
+      setSelectedView('detail');
+      setError('');
+    } else {
+      setError('Evaluation not found for this exam');
+    }
+  };
+
+  const toggleQuestion = (questionNumber: number) => {
+    setExpandedQuestions(prev => ({
+      ...prev,
+      [questionNumber]: !prev[questionNumber]
+    }));
+  };
+
+  const getGradeColor = (percentage: number): string => {
+    if (percentage >= 90) return 'text-green-600';
+    if (percentage >= 80) return 'text-blue-600';
+    if (percentage >= 70) return 'text-yellow-600';
+    if (percentage >= 60) return 'text-orange-600';
+    return 'text-red-600';
+  };
+
+  const getGradeBgColor = (percentage: number): string => {
+    if (percentage >= 90) return 'bg-green-50 border-green-200';
+    if (percentage >= 80) return 'bg-blue-50 border-blue-200';
+    if (percentage >= 70) return 'bg-yellow-50 border-yellow-200';
+    if (percentage >= 60) return 'bg-orange-50 border-orange-200';
+    return 'bg-red-50 border-red-200';
+  };
+
+  const getScorePercentage = (score: number, maxMarks: number): number => {
+    return parseFloat(((score / maxMarks) * 100).toFixed(1));
+  };
+
+  const getGradeLabel = (percentage: number): string => {
+    if (percentage >= 90) return 'Excellent';
+    if (percentage >= 80) return 'Very Good';
+    if (percentage >= 70) return 'Good';
+    if (percentage >= 60) return 'Satisfactory';
+    return 'Needs Improvement';
+  };
+
+  // Filter and sort exams
+  const getFilteredAndSortedExams = () => {
+    let filtered = submittedExams.filter(exam => {
+      // Search filter
+      const matchesSearch = 
+        exam.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        exam.subject.toLowerCase().includes(searchQuery.toLowerCase());
+      
+      if (!matchesSearch) return false;
+
+      // Score filter
+      if (filterScore !== 'all') {
+        const evalData = getEvaluationForExam(exam.session_id);
+        if (!evalData) return false;
+        
+        const percentage = evalData.percentage;
+        if (filterScore === 'excellent' && percentage < 80) return false;
+        if (filterScore === 'good' && (percentage < 60 || percentage >= 80)) return false;
+        if (filterScore === 'poor' && percentage >= 60) return false;
+      }
+
+      return true;
+    });
+
+    // Sort exams
+    filtered.sort((a, b) => {
+      const evalA = getEvaluationForExam(a.session_id);
+      const evalB = getEvaluationForExam(b.session_id);
+
+      switch (sortBy) {
+        case 'date-desc':
+          return new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime();
+        case 'date-asc':
+          return new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime();
+        case 'score-desc':
+          if (!evalA) return 1;
+          if (!evalB) return -1;
+          return evalB.percentage - evalA.percentage;
+        case 'score-asc':
+          if (!evalA) return 1;
+          if (!evalB) return -1;
+          return evalA.percentage - evalB.percentage;
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterScore('all');
+    setSortBy('date-desc');
+  };
+
+  const hasActiveFilters = searchQuery !== '' || filterScore !== 'all' || sortBy !== 'date-desc';
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
@@ -721,7 +781,40 @@ const EvaluatePage = () => {
         </div>
       ) : (
         <div className="animate-fadeIn">
-          {selectedView === 'list' ? <ListView /> : <DetailView />}
+          {selectedView === 'list' ? (
+          <ListView
+            submittedExams={submittedExams}
+            evaluations={evaluations}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            filterScore={filterScore}
+            setFilterScore={setFilterScore}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+            showFilters={showFilters}
+            setShowFilters={setShowFilters}
+            viewEvaluation={viewEvaluation}
+            getEvaluationForExam={getEvaluationForExam}
+            getGradeColor={getGradeColor}
+            getGradeLabel={getGradeLabel}
+            getFilteredAndSortedExams={getFilteredAndSortedExams}
+            clearFilters={clearFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
+        ) : evaluation ? (
+          <DetailView
+            evaluation={evaluation}
+            expandedQuestions={expandedQuestions}
+            toggleQuestion={toggleQuestion}
+            getGradeColor={getGradeColor}
+            getGradeBgColor={getGradeBgColor}
+            getScorePercentage={getScorePercentage}
+            getGradeLabel={getGradeLabel}
+            setSelectedView={setSelectedView}
+            setEvaluation={setEvaluation}
+            setExpandedQuestions={setExpandedQuestions}
+          />
+        ) : null}
         </div>
       )}
 

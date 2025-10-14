@@ -5,28 +5,34 @@ from enum import Enum
 # Chat/RAG Models
 class ChatRequest(BaseModel):
     question: str = Field(..., description="User question")
-    subject: Optional[str] = Field(None, description="Subject filter (DataMining, Network)")
+    subject: Optional[str] = Field(None, description="Subject filter (DataMining, Network, Distributed, Energy)")
+    session_id: Optional[str] = Field(None, description="Session ID for conversation tracking")
 
 class ChatResponse(BaseModel):
     generation: str = Field(..., description="Generated answer")
-    sources: Optional[List[Dict[str, Any]]] = Field(None, description="Source documents")
+    sources: Optional[List[Dict[str, Any]]] = Field(None, description="Source documents with metadata")
     is_conversational: bool = Field(False, description="Whether response is conversational")
     subject: Optional[str] = Field(None, description="Applied subject filter")
+    answer_quality: Optional[str] = Field(None, description="Quality indicator: excellent, good, needs_improvement")
 
 class ChatSession(BaseModel):
     session_id: str
-    messages: List[Dict[str, str]]
+    messages: List[Dict[str, Any]]
+    created_at: Optional[str] = None
+    last_updated: Optional[str] = None
+    subject_focus: Optional[str] = None
 
 # Quiz Models
 class DifficultyLevel(str, Enum):
     EASY = "easy"
-    MEDIUM = "medium" 
+    MEDIUM = "medium"
     HARD = "hard"
 
 class QuizGenerateRequest(BaseModel):
     topic: str = Field(..., description="Topic for quiz generation")
     subject: Optional[str] = Field(None, description="Subject filter")
     num_questions: int = Field(5, ge=1, le=20, description="Number of questions")
+    difficulty: Optional[DifficultyLevel] = Field(None, description="Difficulty level filter")
 
 class QuizQuestion(BaseModel):
     question: str
@@ -96,6 +102,17 @@ class FlashcardReviewRequest(BaseModel):
     card_index: int
     difficulty_rating: int = Field(..., ge=1, le=5, description="1=very easy, 5=very hard")
 
+# Feedback Models
+class FeedbackRequest(BaseModel):
+    session_id: str
+    message_index: int
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1 (poor) to 5 (excellent)")
+    comment: Optional[str] = Field(None, description="Optional feedback comment")
+
+class FeedbackResponse(BaseModel):
+    success: bool
+    message: str
+
 # Common response models
 class ErrorResponse(BaseModel):
     error: str
@@ -104,9 +121,8 @@ class ErrorResponse(BaseModel):
 class SuccessResponse(BaseModel):
     success: bool
     message: str
+    data: Optional[Dict[str, Any]] = None
     
-# Add these models to your existing api/models.py file
-
 # Exam Models
 class ExamGenerateRequest(BaseModel):
     topic: str = Field(..., description="Topic for exam generation")
