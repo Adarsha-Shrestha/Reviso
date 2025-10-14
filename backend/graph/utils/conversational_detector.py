@@ -5,41 +5,41 @@ from pydantic import BaseModel, Field
 
 
 class QueryType(BaseModel):
-    """Classify query type"""
+    """Query classification"""
     
     is_conversational: bool = Field(
-        description="True if this is a simple greeting, casual conversation, or social interaction"
+        description="True if greeting, thanks, or casual chat"
     )
     is_question: bool = Field(
-        description="True if this requires factual information or knowledge"
+        description="True if seeking factual information about the subject"
+    )
+    requires_context: bool = Field(
+        description="True if references previous conversation"
     )
 
 
 llm = ChatOpenAI(temperature=0, model="gpt-4o-mini")
 structured_llm = llm.with_structured_output(QueryType)
 
-system = """You are an expert at classifying user queries. Determine if a query is:
+# Simplified system prompt
+system = """Classify the user's query for a {subject} learning assistant:
 
-1. CONVERSATIONAL: 
-   - Simple greetings (hello, hi, how are you), casual chat, social interactions, or pleasantries
-   - Questions or topics that are *outside the given subject domain*
-   - General small talk or unrelated inquiries (e.g., "what is the weather", "how old are you", "tell me a joke")
+**CONVERSATIONAL** (casual, not seeking information):
+- Greetings: "hi", "hello"
+- Thanks: "thanks", "thank you"
+- Casual: "how are you"
+- Off-topic questions
 
-2. QUESTION: 
-   - Requests for factual information, explanations, or knowledge *strictly within the given subject domain*.
+**QUESTION** (seeking information):
+- Questions about {subject} topics
+- Requests for explanations
+- "What is...", "How does...", "Explain..."
 
-Given subject: {subject}
+**REQUIRES CONTEXT**:
+- Follow-ups: "tell me more", "what about..."
+- References: "you mentioned...", "in your last answer"
 
-Examples (assuming subject = "AI"):
-- "hello" → conversational: true, question: false  
-- "what is weather?" → conversational: true, question: false  
-- "tell me about cats" → conversational: true, question: false  
-- "what is classification in AI?" → conversational: false, question: true  
-- "explain neural networks" → conversational: false, question: true  
-- "thanks" → conversational: true, question: false  
-
-Be strict: mark as question **only** if it is clearly a factual query about the given subject.
-"""
+Be strict: Only mark as question if it's truly about {subject}."""
 
 query_classifier_prompt = ChatPromptTemplate.from_messages([
     ("system", system),
@@ -49,18 +49,24 @@ query_classifier_prompt = ChatPromptTemplate.from_messages([
 query_classifier = query_classifier_prompt | structured_llm
 
 
-def detect_conversational_query(query: str, subject: str) -> Dict[str, bool]:
+def detect_conversational_query(query: str, subject: str = "general") -> Dict:
     """
-    Detect if a query is conversational or informational
+    Detect query type with minimal overhead
     
     Args:
-        query: User input query
+        query: User input
+        subject: Subject context
         
     Returns:
-        Dict with is_conversational and is_question flags
+        Dict with classification flags
     """
-    result = query_classifier.invoke({"query": query, "subject": subject})
+    result = query_classifier.invoke({
+        "query": query,
+        "subject": subject or "general topics"
+    })
+    
     return {
         "is_conversational": result.is_conversational,
-        "is_question": result.is_question
+        "is_question": result.is_question,
+        "requires_context": result.requires_context
     }

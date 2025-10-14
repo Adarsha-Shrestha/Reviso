@@ -3,7 +3,6 @@ from langchain_core.runnables import RunnableSequence
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
-
 class GradeAnswer(BaseModel):
 
     binary_score: bool = Field(

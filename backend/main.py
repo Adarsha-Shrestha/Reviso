@@ -16,6 +16,7 @@ from graph.graph import app as rag_app
 from quiz import QuizSystem
 from flashcard import FlashcardSystem
 from proctoring import ProctoringSystem
+from exam import ExamSystem
 
 # Import API routers
 from api.chat import router as chat_router
@@ -24,6 +25,7 @@ from api.flashcard import router as flashcard_router
 from api.proctoring import router as proctoring_router, set_proctoring_system
 from api.ingestion import router as ingestion_router
 from api.models import *
+from api.exam import router as exam_router
 
 
 
@@ -31,19 +33,20 @@ from api.models import *
 quiz_system = None
 flashcard_system = None
 proctoring_system = None
+exam_system = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    global quiz_system, flashcard_system
+    global quiz_system, flashcard_system, exam_system  # ADD exam_system here
     print("Initializing systems...")
     
     try:
         quiz_system = QuizSystem()
         flashcard_system = FlashcardSystem()
+        exam_system = ExamSystem()  # ADD THIS LINE
         proctoring_system = ProctoringSystem()
         set_proctoring_system(proctoring_system)
-        # rag_app = rag_graph  # Store the graph
         print("Systems initialized successfully")
     except Exception as e:
         print(f"Error initializing systems: {e}")
@@ -91,6 +94,11 @@ def get_proctoring_system() -> ProctoringSystem:
         raise HTTPException(status_code=500, detail="Proctoring system not initialized")
     return proctoring_system
 
+def get_exam_system() -> ExamSystem:
+    if exam_system is None:
+        raise HTTPException(status_code=500, detail="Exam system not initialized")
+    return exam_system
+
 def get_rag_app():
     return rag_app
 
@@ -100,7 +108,7 @@ app.include_router(quiz_router, prefix="/api/quiz", tags=["quiz"])
 app.include_router(flashcard_router, prefix="/api/flashcard", tags=["flashcard"])
 app.include_router(proctoring_router, prefix="/api/proctoring", tags=["Proctoring"])
 app.include_router(ingestion_router, prefix="/api/ingestion", tags=["Ingestion"])
-
+app.include_router(exam_router, prefix="/api/exam", tags=["exam"])
 
 @app.get("/")
 async def root():
@@ -112,7 +120,8 @@ async def health_check():
         "status": "healthy",
         "rag_system": "initialized",
         "quiz_system": "initialized" if quiz_system else "not initialized",
-        "flashcard_system": "initialized" if flashcard_system else "not initialized"
+        "flashcard_system": "initialized" if flashcard_system else "not initialized",
+        "exam_system": "initialized" if exam_system else "not initialized"
     }
 
 if __name__ == "__main__":

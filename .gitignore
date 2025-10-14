@@ -231,3 +231,7 @@ frontend/my-app/.env.local
 frontend/my-app/.env.development.local
 frontend/my-app/.env.production.local
 frontend/my-app/.env.test.local
+frontend/my-app/SETUP_GUIDE.md 
+frontend/my-app/TROUBLESHOOTING.md
+frontend/my-app/INSTALLATION.md
+frontend/my-app/README.md

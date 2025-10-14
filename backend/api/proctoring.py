@@ -1,27 +1,30 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime
+import asyncio
 
 router = APIRouter()
 
-# Global proctoring system instance (will be injected from main.py)
+# Global proctoring system instance
 proctoring_system = None
 
 def set_proctoring_system(system):
     """Set the global proctoring system instance"""
     global proctoring_system
     proctoring_system = system
+    print("Proctoring system initialized in API routes")
 
 # Pydantic Models
 class StartProctoringRequest(BaseModel):
     username: str
-    exam_duration: Optional[int] = 100  # Duration in seconds
+    exam_duration: Optional[int] = 3600  # Duration in seconds (default 1 hour)
 
 class ProctoringStatusResponse(BaseModel):
     active: bool
     time_remaining: int
+    username: Optional[str] = None
 
 class UserDataResponse(BaseModel):
     username: str
@@ -32,12 +35,14 @@ class UserDataResponse(BaseModel):
 class ProctoringResponse(BaseModel):
     status: str
     message: str
+    data: Optional[Dict[str, Any]] = None
 
 class AltTabEvent(BaseModel):
     type: str
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     time_elapsed: Optional[float] = None
+    username: Optional[str] = None
 
 # API Endpoints
 
@@ -48,23 +53,44 @@ async def start_proctoring(request: StartProctoringRequest):
     
     Parameters:
     - username: The username of the student
-    - exam_duration: Duration of exam in seconds (default: 100)
+    - exam_duration: Duration of exam in seconds (default: 3600 = 1 hour)
     """
     if proctoring_system is None:
         raise HTTPException(status_code=500, detail="Proctoring system not initialized")
     
+    if not request.username or request.username.strip() == "":
+        raise HTTPException(status_code=400, detail="Username is required")
+    
+    # Check if already active
+    if proctoring_system.video_feed_active:
+        return ProctoringResponse(
+            status="already_active",
+            message=f"Proctoring is already active for user: {proctoring_system.current_username}",
+            data={
+                "current_user": proctoring_system.current_username,
+                "time_remaining": proctoring_system.get_feed_status()["time_remaining"]
+            }
+        )
+    
     try:
         # Set exam duration if provided
-        if request.exam_duration:
+        if request.exam_duration and request.exam_duration > 0:
             proctoring_system.total_time = request.exam_duration
         
+        # Start proctoring
         proctoring_system.start_proctoring(request.username)
         
         return ProctoringResponse(
             status="active",
-            message=f"Proctoring started for {request.username} (Duration: {request.exam_duration}s)"
+            message=f"Proctoring started successfully for {request.username}",
+            data={
+                "username": request.username,
+                "duration_seconds": proctoring_system.total_time,
+                "duration_minutes": proctoring_system.total_time // 60
+            }
         )
     except Exception as e:
+        print(f"Error starting proctoring: {e}")
         raise HTTPException(status_code=500, detail=f"Error starting proctoring: {str(e)}")
 
 
@@ -76,13 +102,26 @@ async def stop_proctoring():
     if proctoring_system is None:
         raise HTTPException(status_code=500, detail="Proctoring system not initialized")
     
-    try:
-        proctoring_system.stop_proctoring()
+    if not proctoring_system.video_feed_active:
         return ProctoringResponse(
             status="inactive",
-            message="Proctoring stopped successfully"
+            message="Proctoring is not currently active"
+        )
+    
+    try:
+        username = proctoring_system.current_username
+        proctoring_system.stop_proctoring()
+        
+        return ProctoringResponse(
+            status="inactive",
+            message=f"Proctoring stopped successfully for {username}",
+            data={
+                "username": username,
+                "stopped_at": datetime.now().isoformat()
+            }
         )
     except Exception as e:
+        print(f"Error stopping proctoring: {e}")
         raise HTTPException(status_code=500, detail=f"Error stopping proctoring: {str(e)}")
 
 
@@ -98,9 +137,11 @@ async def get_proctoring_status():
         status = proctoring_system.get_feed_status()
         return ProctoringStatusResponse(
             active=status["active"],
-            time_remaining=status["time_remaining"]
+            time_remaining=status["time_remaining"],
+            username=proctoring_system.current_username if status["active"] else None
         )
     except Exception as e:
+        print(f"Error getting status: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting status: {str(e)}")
 
 
@@ -118,7 +159,13 @@ async def video_feed(username: str):
     if not proctoring_system.video_feed_active:
         raise HTTPException(
             status_code=400,
-            detail="Video feed is not active. Please start proctoring first."
+            detail="Video feed is not active. Please start proctoring first using /start endpoint."
+        )
+    
+    if proctoring_system.current_username != username:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Video feed is active for user '{proctoring_system.current_username}', not '{username}'"
         )
     
     try:
@@ -127,6 +174,7 @@ async def video_feed(username: str):
             media_type="multipart/x-mixed-replace; boundary=frame"
         )
     except Exception as e:
+        print(f"Error streaming video: {e}")
         raise HTTPException(status_code=500, detail=f"Error streaming video: {str(e)}")
 
 
