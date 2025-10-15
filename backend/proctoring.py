@@ -56,7 +56,7 @@ class ProctoringSystem:
         self.RECORDING_DIR = "cheating_recordings"
         self.is_recording = False
         self.out = None
-        self.MINIMUM_CHEATING_DURATION = 0.2
+        self.MINIMUM_CHEATING_DURATION = 0.7
         self.current_cheating_start = None
         self.current_cheating_flags = set()
         

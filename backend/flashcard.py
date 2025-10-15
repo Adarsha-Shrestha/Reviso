@@ -61,7 +61,7 @@ class FlashcardSet(BaseModel):
     subject: str = Field(description="Academic subject area")
 
 # LLMs and chains
-llm = ChatOpenAI(temperature=0.3, model="gpt-3.5-turbo")
+llm = ChatOpenAI(temperature=0.3, model="gpt-4o-mini")
 structured_llm_flashcard = llm.with_structured_output(FlashcardSet)
 
 flashcard_system_prompt = """You are an expert educational content creator specializing in generating effective flashcards for active recall and spaced repetition learning.

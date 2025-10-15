@@ -235,3 +235,6 @@ frontend/my-app/SETUP_GUIDE.md
 frontend/my-app/TROUBLESHOOTING.md
 frontend/my-app/INSTALLATION.md
 frontend/my-app/README.md
+
+admin/node_modules/
+admin/.next/
