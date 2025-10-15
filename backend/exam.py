@@ -71,7 +71,12 @@ structured_llm_exam = llm.with_structured_output(ExamData)
 
 exam_system_prompt = """You are an expert educational content creator specializing in generating comprehensive exam questions.
 
-Your task is to create {num_hard} HARD questions (10 marks each) and {num_medium} MEDIUM questions (5 marks each) based on the provided documents.
+CRITICAL REQUIREMENT: You MUST generate EXACTLY {total_questions} questions in total:
+- EXACTLY {num_hard} HARD questions (10 marks each)
+- EXACTLY {num_medium} MEDIUM questions (5 marks each)
+- Total questions MUST be: {total_questions}
+
+DO NOT generate more or fewer questions than specified above.
 
 **HARD Questions (10 marks each):**
 - Should test deep understanding and analytical skills
@@ -94,11 +99,11 @@ Your task is to create {num_hard} HARD questions (10 marks each) and {num_medium
 5. Include a sample comprehensive answer for each question
 6. Ensure questions test different cognitive levels (understand, apply, analyze, evaluate)
 
-**Question Distribution:**
-- First {num_hard} questions: HARD (10 marks each)
-- Next {num_medium} questions: MEDIUM (5 marks each)
+**STRICT Question Distribution (FOLLOW EXACTLY):**
+- Questions 1 to {num_hard}: HARD (10 marks each)
+- Questions {start_medium} to {total_questions}: MEDIUM (5 marks each)
 
-Generate questions that thoroughly assess knowledge of the topic."""
+REMINDER: Generate EXACTLY {total_questions} questions total. Count carefully."""
 
 exam_prompt = ChatPromptTemplate.from_messages([
     ("system", exam_system_prompt),
@@ -107,10 +112,12 @@ exam_prompt = ChatPromptTemplate.from_messages([
 Documents:
 {documents}
 
-Number of HARD questions (10 marks): {num_hard}
-Number of MEDIUM questions (5 marks): {num_medium}
+MANDATORY REQUIREMENTS:
+- Total questions to generate: {total_questions}
+- HARD questions (10 marks each): {num_hard}
+- MEDIUM questions (5 marks each): {num_medium}
 
-Please generate exam questions based on this content.""")
+Generate EXACTLY {total_questions} exam questions based on this content. Do not generate more or fewer questions.""")
 ])
 
 exam_generator_chain: RunnableSequence = exam_prompt | structured_llm_exam
@@ -207,6 +214,7 @@ def generate_exam(state: ExamState) -> Dict[str, Any]:
     # Default exam configuration: 3 hard + 9 medium = 12 questions
     num_hard = exam_config.get("num_hard", 3)
     num_medium = exam_config.get("num_medium", 9)
+    total_questions = num_hard + num_medium
     
     if not documents:
         print("---NO DOCUMENTS AVAILABLE FOR EXAM GENERATION---")
@@ -217,66 +225,103 @@ def generate_exam(state: ExamState) -> Dict[str, Any]:
             "subject": subject
         }
     
-    try:
-        # Combine document content (take more content for comprehensive exam)
-        doc_content = "\n\n".join([doc.page_content for doc in documents[:15]])
-        
-        # Generate exam questions
-        exam_result = exam_generator_chain.invoke({
-            "documents": doc_content,
-            "topic": topic,
-            "num_hard": num_hard,
-            "num_medium": num_medium
-        })
-        
-        print(f"---GENERATED {len(exam_result.questions)} EXAM QUESTIONS---")
-        
-        # Convert to serializable format and ensure correct marks distribution
-        exam_data = []
-        total_marks = 0
-        
-        for i, q in enumerate(exam_result.questions):
-            # First num_hard questions should be 10 marks (hard)
-            # Next num_medium questions should be 5 marks (medium)
-            if i < num_hard:
-                marks = 10
-                difficulty = "hard"
-            else:
-                marks = 5
-                difficulty = "medium"
+    # Combine document content
+    doc_content = "\n\n".join([doc.page_content for doc in documents[:15]])
+    
+    # Retry logic: Try up to 3 times to get the correct number of questions
+    max_retries = 3
+    exam_result = None
+    
+    for attempt in range(max_retries):
+        try:
+            print(f"---ATTEMPT {attempt + 1}/{max_retries} TO GENERATE {total_questions} QUESTIONS---")
             
-            total_marks += marks
-            
-            exam_data.append({
-                "question_number": i + 1,
-                "question": q.question,
-                "question_type": q.question_type,
-                "difficulty": difficulty,
-                "marks": marks,
-                "key_points": q.key_points,
-                "sample_answer": q.sample_answer
+            # Generate exam questions
+            exam_result = exam_generator_chain.invoke({
+                "documents": doc_content,
+                "topic": topic,
+                "num_hard": num_hard,
+                "num_medium": num_medium,
+                "total_questions": total_questions,
+                "start_medium": num_hard + 1
             })
-        
-        # Generate summary message
-        generation = f"Generated {len(exam_data)} exam questions on {topic}. Total marks: {total_marks}"
-        
-        return {
-            "exam_data": exam_data,
-            "generation": generation,
-            "documents": documents,
-            "question": topic,
-            "subject": subject,
-            "exam_config": {**exam_config, "total_marks": total_marks}
-        }
-        
-    except Exception as e:
-        print(f"---EXAM GENERATION ERROR: {e}---")
+            
+            print(f"---GENERATED {len(exam_result.questions)} QUESTIONS (Expected: {total_questions})---")
+            
+            # Check if we got the right number
+            if len(exam_result.questions) == total_questions:
+                print("---✓ SUCCESS: Correct number of questions generated---")
+                break
+            elif len(exam_result.questions) > total_questions:
+                print(f"---! WARNING: Got {len(exam_result.questions)} questions, trimming to {total_questions}---")
+                # Trim excess questions
+                exam_result.questions = exam_result.questions[:total_questions]
+                break
+            elif attempt < max_retries - 1:
+                print(f"---↻ RETRY: Got {len(exam_result.questions)} questions, retrying...---")
+                continue
+            else:
+                print(f"---! WARNING: After {max_retries} attempts, got {len(exam_result.questions)} questions---")
+                # Proceed with whatever we got
+            
+        except Exception as e:
+            print(f"---ERROR ON ATTEMPT {attempt + 1}: {e}---")
+            if attempt == max_retries - 1:
+                return {
+                    "exam_data": [],
+                    "generation": f"Error generating exam after {max_retries} attempts: {str(e)}",
+                    "question": topic,
+                    "subject": subject
+                }
+            continue
+    
+    if not exam_result or not exam_result.questions:
         return {
             "exam_data": [],
-            "generation": f"Error generating exam: {str(e)}",
+            "generation": "Failed to generate exam questions.",
             "question": topic,
             "subject": subject
         }
+    
+    # Convert to serializable format and ensure correct marks distribution
+    exam_data = []
+    total_marks = 0
+    
+    for i, q in enumerate(exam_result.questions):
+        # First num_hard questions should be 10 marks (hard)
+        # Next num_medium questions should be 5 marks (medium)
+        if i < num_hard:
+            marks = 10
+            difficulty = "hard"
+        else:
+            marks = 5
+            difficulty = "medium"
+        
+        total_marks += marks
+        
+        exam_data.append({
+            "question_number": i + 1,
+            "question": q.question,
+            "question_type": q.question_type,
+            "difficulty": difficulty,
+            "marks": marks,
+            "key_points": q.key_points,
+            "sample_answer": q.sample_answer
+        })
+    
+    # Generate summary message
+    generation = f"Generated {len(exam_data)} exam questions on {topic}. Total marks: {total_marks}"
+    if len(exam_data) != total_questions:
+        generation += f" (Requested {total_questions} questions)"
+    
+    return {
+        "exam_data": exam_data,
+        "generation": generation,
+        "documents": documents,
+        "question": topic,
+        "subject": subject,
+        "exam_config": {**exam_config, "total_marks": total_marks}
+    }
 
 # Build graph
 workflow = StateGraph(ExamState)
@@ -303,6 +348,11 @@ class ExamSystem:
     def generate_exam(self, topic: str, subject: str = None, num_hard: int = 3, num_medium: int = 9):
         """Generate an exam on a specific topic"""
         try:
+            print(f"\n{'='*60}")
+            print(f"GENERATING EXAM: {topic}")
+            print(f"Configuration: {num_hard} HARD + {num_medium} MEDIUM = {num_hard + num_medium} total")
+            print(f"{'='*60}\n")
+            
             response = self.app.invoke({
                 "question": topic,
                 "subject": subject,
@@ -458,18 +508,34 @@ if __name__ == "__main__":
     # Example usage
     exam_system = ExamSystem()
     
-    # Generate exam
+    print("\n" + "="*60)
+    print("EXAM GENERATION SYSTEM - DEMO")
+    print("="*60 + "\n")
+    
+    # Generate exam with custom configuration
     result = exam_system.generate_exam(
         topic="Classification Algorithms",
         subject="DataMining",
-        num_hard=3,
-        num_medium=9
+        num_hard=2,  # 2 hard questions (10 marks each)
+        num_medium=5  # 5 medium questions (5 marks each)
     )
     
-    print(result["message"])
+    print(f"\n{'='*60}")
+    print("RESULT:")
+    print(f"{'='*60}")
+    print(f"Status: {'✓ SUCCESS' if result['success'] else '✗ FAILED'}")
+    print(f"Message: {result['message']}")
     
     if result["success"]:
-        print(f"\nTotal Marks: {result['total_marks']}")
-        print("\nQuestions Generated:")
+        print(f"Total Marks: {result['total_marks']}")
+        print(f"Subject: {result['subject']}")
+        print(f"\n{'='*60}")
+        print("QUESTIONS GENERATED:")
+        print(f"{'='*60}\n")
+        
         for q in result["exam_data"]:
-            print(f"\nQ{q['question_number']}. [{q['marks']} marks] {q['question']}")
+            print(f"Q{q['question_number']}. [{q['difficulty'].upper()} - {q['marks']} marks]")
+            print(f"    {q['question']}")
+            print(f"    Type: {q['question_type']}")
+            print(f"    Key Points: {len(q['key_points'])} points")
+            print()
