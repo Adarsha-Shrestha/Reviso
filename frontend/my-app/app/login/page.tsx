@@ -23,7 +23,7 @@ export default function LoginPage() {
   // Redirect if already authenticated
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      router.push("/dashboard/chat")
+      router.push("/form")
     }
   }, [isAuthenticated, isLoading, router])
 
@@ -38,7 +38,7 @@ export default function LoginPage() {
     const success = login(username, password)
     
     if (success) {
-      router.push("/dashboard/chat")
+      router.push("/form")
     } else {
       setError("Invalid credentials. Try again")
       setIsSubmitting(false)
@@ -126,13 +126,13 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+          {/* <div className="mt-6 p-4 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground text-center">
               Demo credentials: <br />
               <span className="font-mono">username: student</span> <br />
               <span className="font-mono">password: password123</span>
             </p>
-          </div>
+          </div> */}
         </Card>
       </div>
     </div>
